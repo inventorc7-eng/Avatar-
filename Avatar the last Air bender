@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>آفاتار: أنج - سيد العناصر</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a2f1a, #051a0a);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 16px;
+        }
+
+        .game-container {
+            background: linear-gradient(145deg, #2d4a2a, #1d351a);
+            border-radius: 48px;
+            padding: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .game-screen {
+            background: #3a7080;
+            border-radius: 32px;
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: radial-gradient(circle at 30% 40%, #7db5c5, #3e6b7a);
+        }
+
+        .element-status {
+            text-align: center;
+            margin: 12px 0;
+        }
+
+        .element-badge {
+            background: rgba(0,0,0,0.6);
+            padding: 8px 20px;
+            border-radius: 40px;
+            display: inline-block;
+            color: #ffefb9;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .elements-bar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .element-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 3px solid #ffd966;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+        }
+
+        .element-icon.active {
+            transform: scale(1.1);
+            border-width: 4px;
+            box-shadow: 0 0 20px currentColor;
+        }
+
+        .element-icon:active {
+            transform: scale(0.95);
+        }
+
+        /* ألوان لكل عنصر */
+        .fire.active, .fire:active { box-shadow: 0 0 20px #ff5500; border-color: #ff5500; }
+        .water.active, .water:active { box-shadow: 0 0 20px #3399ff; border-color: #3399ff; }
+        .earth.active, .earth:active { box-shadow: 0 0 20px #8B5A2B; border-color: #cd853f; }
+        .air.active, .air:active { box-shadow: 0 0 20px #e0e0e0; border-color: #ffffff; }
+
+        /* أزرار الحركات */
+        .actions-bar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            background: linear-gradient(145deg, #3a3a3a, #222);
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 12px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.1s;
+            box-shadow: 0 5px 0 #111;
+            flex: 1;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .action-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #111;
+        }
+
+        .action-btn.special {
+            background: linear-gradient(145deg, #b8860b, #8b5a2b);
+            color: #ffefb9;
+        }
+
+        .info {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.8rem;
+            color: #ffefb9aa;
+        }
+
+        @media (max-width: 480px) {
+            .element-icon { width: 55px; height: 55px; font-size: 1.5rem; }
+            .action-btn { padding: 10px 12px; font-size: 0.9rem; min-width: 70px; }
+            .element-badge { font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-screen">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <div class="element-status">
+            <div class="element-badge" id="elementDisplay">🔥 القوة الحالية: النار</div>
+        </div>
+
+        <div class="elements-bar">
+            <div class="element-icon fire" data-element="fire">🔥</div>
+            <div class="element-icon water" data-element="water">💧</div>
+            <div class="element-icon earth" data-element="earth">⛰️</div>
+            <div class="element-icon air" data-element="air">🌪️</div>
+        </div>
+
+        <div class="actions-bar" id="actionsBar">
+            <!-- الأزرار هتتغير حسب العنصر المختار -->
+        </div>
+
+        <div class="info">
+            💡 اضغط على أيقونة العنصر لتغيير القوة | اضغط على الشاشة لتنفيذ الحركة
+        </div>
+    </div>
+
+    <script>
+        // إعدادات اللعبة
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // ضبط حجم الكانفاس
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // حالة اللعبة
+        let currentElement = 'fire';
+        let particles = [];
+        let aang = {
+            x: canvas.width / 2,
+            y: canvas.height - 80,
+            width: 50,
+            height: 50
+        };
+        
+        // تحديث موقع أنج عند تغيير الحجم
+        function updateAangPosition() {
+            aang.x = canvas.width / 2;
+            aang.y = canvas.height - 80;
+        }
+        
+        // رسم أنج
+        function drawAang() {
+            // الجسم
+            ctx.fillStyle = '#e0b080';
+            ctx.beginPath();
+            ctx.arc(aang.x, aang.y - 15, 20, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // عيون
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(aang.x - 8, aang.y - 22, 3, 0, Math.PI * 2);
+            ctx.arc(aang.x + 8, aang.y - 22, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // علامة الهواة الرياح على الجبهة
+            ctx.fillStyle = '#4169E1';
+            ctx.beginPath();
+            ctx.arc(aang.x, aang.y - 30, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(aang.x, aang.y - 30, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // ملابس أنج (اللبس البرتقالي)
+            ctx.fillStyle = '#ff8c42';
+            ctx.fillRect(aang.x - 18, aang.y - 12, 36, 30);
+            
+            // وشاح أصفر
+            ctx.fillStyle = '#ffd966';
+            ctx.fillRect(aang.x - 22, aang.y - 8, 44, 12);
+            
+            // عصا الطيران (Glider)
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(aang.x + 15, aang.y - 25, 25, 6);
+            ctx.fillStyle = '#cd853f';
+            ctx.beginPath();
+            ctx.rect(aang.x + 38, aang.y - 27, 10, 10);
+            ctx.fill();
+        }
+        
+        // إضافة جسيمات
+        function addParticles(x, y, count, color, size) {
+            for(let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8 - 3,
+                    life: 1,
+                    color: color,
+                    size: size || Math.random() * 6 + 3
+                });
+            }
+        }
+        
+        // تحديث الجسيمات
+        function updateParticles() {
+            for(let i = particles.length-1; i >= 0; i--) {
+                particles[i].x += particles[i].vx;
+                particles[i].y += particles[i].vy;
+                particles[i].vy += 0.3;
+                particles[i].life -= 0.02;
+                if(particles[i].life <= 0 || particles[i].y > canvas.height) {
+                    particles.splice(i,1);
+                }
+            }
+        }
+        
+        // رسم الجسيمات
+        function drawParticles() {
+            for(let p of particles) {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+        
+        // تنفيذ الحركة حسب العنصر
+        function performAction(actionType) {
+            let x = aang.x;
+            let y = aang.y - 30;
+            
+            switch(currentElement) {
+                case 'fire':
+                    if(actionType === 'basic') {
+                        addParticles(x, y, 20, '#ff5500', 6);
+                        addParticles(x, y, 15, '#ffaa00', 5);
+                    } else {
+                        addParticles(x, y, 40, '#ff3300', 8);
+                        addParticles(x, y-10, 30, '#ff7700', 7);
+                    }
+                    break;
+                case 'water':
+                    if(actionType === 'basic') {
+                        addParticles(x, y, 25, '#3399ff', 5);
+                    } else {
+                        addParticles(x, y, 35, '#00aaff', 6);
+                        addParticles(x-15, y, 15, '#88ccff', 4);
+                    }
+                    break;
+                case 'earth':
+                    if(actionType === 'basic') {
+                        addParticles(x, y+20, 15, '#8B5A2B', 7);
+                        addParticles(x+10, y+15, 15, '#cd853f', 6);
+                    } else {
+                        addParticles(x, y+25, 30, '#5a3a1a', 9);
+                        addParticles(x-10, y+20, 20, '#a56b2f', 7);
+                    }
+                    break;
+                case 'air':
+                    if(actionType === 'basic') {
+                        addParticles(x, y, 30, '#e0e0e0', 5);
+                        addParticles(x-10, y-5, 20, '#c0c0ff', 4);
+                    } else {
+                        addParticles(x, y, 50, '#ffffff', 6);
+                        addParticles(x+15, y-10, 25, '#aaccff', 5);
+                    }
+                    break;
+            }
+        }
+        
+        // تغيير العنصر
+        function setElement(element) {
+            currentElement = element;
+            updateActionsUI();
+            updateElementDisplay();
+            
+            // تحديث الـ active class على الأيقونات
+            document.querySelectorAll('.element-icon').forEach(icon => {
+                if(icon.dataset.element === element) {
+                    icon.classList.add('active');
+                } else {
+                    icon.classList.remove('active');
+                }
+            });
+        }
+        
+        // تحديث واجهة الأزرار حسب العنصر
+        function updateActionsUI() {
+            const actionsBar = document.getElementById('actionsBar');
+            const elementNames = {
+                fire: { name: '🔥 نار', basic: '🔥 قبضة نارية', special: '🌋 كرة نارية' },
+                water: { name: '💧 ماء', basic: '💧 قذيفة ماء', special: '🌊 موجة مائية' },
+                earth: { name: '⛰️ أرض', basic: '🪨 صخرة صغيرة', special: '🗻 زلزال' },
+                air: { name: '🌪️ هواء', basic: '💨 عاصفة هواء', special: '🌀 إعصار' }
+            };
+            
+            const el = elementNames[currentElement];
+            actionsBar.innerHTML = `
+                <button class="action-btn" onclick="performAction('basic')">${el.basic}</button>
+                <button class="action-btn special" onclick="performAction('special')">${el.special}</button>
+            `;
+        }
+        
+        function updateElementDisplay() {
+            const names = { fire: '🔥 النار', water: '💧 الماء', earth: '⛰️ الأرض', air: '🌪️ الهواء' };
+            document.getElementById('elementDisplay').innerHTML = `✨ القوة الحالية: ${names[currentElement]} ✨`;
+        }
+        
+        // رسم الخلفية
+        function drawBackground() {
+            // أرض
+            ctx.fillStyle = '#6b4c3b';
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+            ctx.fillStyle = '#8b6946';
+            for(let i = 0; i < 10; i++) {
+                ctx.fillRect(i * 50, canvas.height - 45, 30, 10);
+            }
+        }
+        
+        // حلقة الرسم
+        function animate() {
+            if(canvas.width === 0) return;
+            
+            updateParticles();
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawAang();
+            drawParticles();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // تحديث موقع أنج عند تغيير الحجم
+        const resizeObserver = new ResizeObserver(() => {
+            resizeCanvas();
+            updateAangPosition();
+        });
+        resizeObserver.observe(canvas.parentElement);
+        
+        // أحداث الضغط على الشاشة
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let clickX = (e.clientX - rect.left) * scaleX;
+            let clickY = (e.clientY - rect.top) * scaleY;
+            
+            // حركة أساسية عند الضغط على الشاشة
+            performAction('basic');
+        });
+        
+        // إضافة أحداث للأيقونات
+        document.querySelectorAll('.element-icon').forEach(icon => {
+            icon.addEventListener('click', () => {
+                setElement(icon.dataset.element);
+            });
+        });
+        
+        // بدء اللعبة
+        updateAangPosition();
+        setElement('fire');
+        animate();
+    </script>
+</body>
+</html>
